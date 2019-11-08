@@ -12,23 +12,23 @@ use rumble::api::{BDAddr, Central, CentralEvent, Peripheral};
 use rumble::api::CentralEvent::{DeviceDiscovered, DeviceUpdated};
 
 pub struct RumbleBleRepo {
-    central: Option<Arc<ConnectedAdapter>>,
+    adapter: Option<Arc<ConnectedAdapter>>,
     device_filter: Option<fn([u8; 6], String) -> bool>,
 }
 
 impl RumbleBleRepo {
     pub fn new() -> RumbleBleRepo {
         let mut repo = RumbleBleRepo {
-            central: None,
+            adapter: None,
             device_filter: None,
         };
-        repo.init_central();
+        repo.init_adapter();
         repo
     }
 
-    pub fn scan(self, mut timeout: u64, stop_on_found: bool) -> Vec<[u8; 6]> {
-        let central = self.central.unwrap();
-        let central_clone = central.clone();
+    pub fn scan(&self, mut timeout: u64, stop_on_found: bool) -> Vec<[u8; 6]> {
+        let adapter = self.adapter.as_ref().unwrap();
+        let adapter_clone = adapter.clone();
 
         let found_devices : Arc<Mutex<Vec<[u8; 6]>>> = Arc::new(Mutex::new(Vec::new()));
         let found_devices_clone = found_devices.clone();
@@ -39,9 +39,9 @@ impl RumbleBleRepo {
         let scan_done_clone = scan_done.clone();
 
         // Defining the on device found callback.
-        central.on_event(Box::new(move |event: CentralEvent| {
+        adapter.on_event(Box::new(move |event: CentralEvent| {
             if let DeviceUpdated(address) = event {
-                let device_properties = central_clone.peripheral(address)
+                let device_properties = adapter_clone.peripheral(address)
                     .unwrap().properties();
 
                 if device_properties.discovery_count == 2 {
@@ -64,14 +64,14 @@ impl RumbleBleRepo {
         }));
 
         // Actually start the scan
-        central.start_scan();
+        adapter.start_scan();
 
         while timeout > 0 && !scan_done.load(Ordering::Relaxed) {
             thread::sleep(Duration::from_secs(1));
             timeout -= 1;
         }
 
-        central.stop_scan();
+        adapter.stop_scan();
 
         return found_devices.lock().unwrap().clone().to_vec();
     }
@@ -80,17 +80,18 @@ impl RumbleBleRepo {
         self.device_filter = Some(device_filter);
     }
 
-    fn init_central(&mut self) {
+    fn init_adapter(&mut self) {
         let manager = Manager::new().unwrap();
-        // get the first adapter
+
+        // Get the first adapter
         let adapters = manager.adapters().unwrap();
         let mut adapter = adapters.into_iter().nth(0).unwrap();
 
-        // reset the adapter -- clears out any errant state
+        // Reset the adapter -- clears out any errant state
         adapter = manager.down(&adapter).unwrap();
         adapter = manager.up(&adapter).unwrap();
 
-        // connect to adapter
-        self.central = Some(Arc::new(adapter.connect().unwrap()));
+        // Connect to adapter
+        self.adapter = Some(Arc::new(adapter.connect().unwrap()));
     }
 }
