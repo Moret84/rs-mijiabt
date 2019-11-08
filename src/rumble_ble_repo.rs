@@ -8,15 +8,20 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use rumble::bluez::manager::Manager;
 use rumble::bluez::adapter::ConnectedAdapter;
+
 use rumble::api::{BDAddr, Central, CentralEvent, Peripheral};
 use rumble::api::CentralEvent::{DeviceDiscovered, DeviceUpdated};
 
+/// An implementation of a BleRepo using rumble crate
 pub struct RumbleBleRepo {
+    /// The reference to the underlying device adapter
     adapter: Option<Arc<ConnectedAdapter>>,
+    /// The device filter to use, or not.
     device_filter: Option<fn([u8; 6], String) -> bool>,
 }
 
 impl RumbleBleRepo {
+    /// Return a new instance of a Rumble ble repo.
     pub fn new() -> RumbleBleRepo {
         let mut repo = RumbleBleRepo {
             adapter: None,
@@ -26,6 +31,13 @@ impl RumbleBleRepo {
         repo
     }
 
+    /// Scan for around, looking for devices.
+    ///
+    /// Returns a GUID list of found devices.
+    ///
+    /// # Arguments:
+    /// * `timeout` - A timeout for the scan.
+    /// * `stop_on_found` - Whether to stop when a device is found or not.
     pub fn scan(&self, mut timeout: u64, stop_on_found: bool) -> Vec<[u8; 6]> {
         let adapter = self.adapter.as_ref().unwrap();
         let adapter_clone = adapter.clone();
@@ -76,10 +88,12 @@ impl RumbleBleRepo {
         return found_devices.lock().unwrap().clone().to_vec();
     }
 
+    /// Populate the device filter
     pub fn set_device_filter(&mut self, device_filter: fn([u8; 6], String) -> bool) {
         self.device_filter = Some(device_filter);
     }
 
+    /// Init the underlying adapter.
     fn init_adapter(&mut self) {
         let manager = Manager::new().unwrap();
 
