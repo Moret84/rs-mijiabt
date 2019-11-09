@@ -15,7 +15,7 @@ use rumble::api::CentralEvent::{DeviceDiscovered, DeviceUpdated};
 /// An implementation of a BleRepo using rumble crate
 pub struct RumbleBleRepo {
     /// The reference to the underlying device adapter
-    adapter: Option<Arc<ConnectedAdapter>>,
+    adapter: Arc<ConnectedAdapter>,
     /// The device filter to use, or not.
     device_filter: Option<fn([u8; 6], String) -> bool>,
 }
@@ -23,12 +23,20 @@ pub struct RumbleBleRepo {
 impl RumbleBleRepo {
     /// Return a new instance of a Rumble ble repo.
     pub fn new() -> RumbleBleRepo {
-        let mut repo = RumbleBleRepo {
-            adapter: None,
+        let manager = Manager::new().unwrap();
+
+        // Get the first adapter
+        let adapters = manager.adapters().unwrap();
+        let mut adapter = adapters.into_iter().nth(0).unwrap();
+
+        // Reset the adapter -- clears out any errant state
+        adapter = manager.down(&adapter).unwrap();
+        adapter = manager.up(&adapter).unwrap();
+
+        RumbleBleRepo {
+            adapter: Arc::new(adapter.connect().unwrap()),
             device_filter: None,
-        };
-        repo.init_adapter();
-        repo
+        }
     }
 
     /// Scan for around, looking for devices.
@@ -39,51 +47,54 @@ impl RumbleBleRepo {
     /// * `timeout` - A timeout for the scan.
     /// * `stop_on_found` - Whether to stop when a device is found or not.
     pub fn scan(&self, mut timeout: u64, stop_on_found: bool) -> Vec<[u8; 6]> {
-        let adapter = self.adapter.as_ref().unwrap();
-        let adapter_clone = adapter.clone();
 
         let found_devices : Arc<Mutex<Vec<[u8; 6]>>> = Arc::new(Mutex::new(Vec::new()));
         let found_devices_clone = found_devices.clone();
 
-        let device_filter = self.device_filter;
-
         let scan_done : Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
+
+        let adapter = self.adapter.clone();
+        let device_filter = self.device_filter;
         let scan_done_clone = scan_done.clone();
 
-        // Defining the on device found callback.
-        adapter.on_event(Box::new(move |event: CentralEvent| {
-            if let DeviceUpdated(address) = event {
-                let device_properties = adapter_clone.peripheral(address)
-                    .unwrap().properties();
+        let on_device_updated = move |address: BDAddr| {
+            let device_properties = adapter.clone().peripheral(address)
+                .unwrap().properties();
 
-                if device_properties.discovery_count == 2 {
-                    let device_name = match device_properties.local_name {
-                        None => String::from("Unknown"),
-                        Some(name) => name,
-                    };
+            if device_properties.discovery_count == 2 {
+                let device_name = match device_properties.local_name {
+                    None => String::from("Unknown"),
+                    Some(name) => name,
+                };
 
-                    found_devices_clone.lock().unwrap().push(address.address);
+                found_devices_clone.lock().unwrap().push(address.address);
 
-                    if let Some(filter) = device_filter {
-                        if (filter)(address.address, device_name) {
-                            if stop_on_found {
-                                scan_done_clone.store(true, Ordering::Relaxed);
-                            }
+                if let Some(filter) = device_filter {
+                    if (filter)(address.address, device_name) {
+                        if stop_on_found {
+                            scan_done_clone.store(true, Ordering::Relaxed);
                         }
                     }
                 }
             }
+        };
+
+        self.adapter.on_event(Box::new(move |event: CentralEvent| {
+            // If a DeviceUpdated event occured
+            if let DeviceUpdated(address) = event {
+                on_device_updated(address);
+            }
         }));
 
         // Actually start the scan
-        adapter.start_scan();
+        self.adapter.start_scan();
 
         while timeout > 0 && !scan_done.load(Ordering::Relaxed) {
             thread::sleep(Duration::from_secs(1));
             timeout -= 1;
         }
 
-        adapter.stop_scan();
+        self.adapter.stop_scan();
 
         return found_devices.lock().unwrap().clone().to_vec();
     }
