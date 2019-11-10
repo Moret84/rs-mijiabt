@@ -2,7 +2,6 @@ extern crate rumble;
 
 use std::thread;
 use std::time::Duration;
-use std::ops::Deref;
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -10,7 +9,14 @@ use rumble::bluez::manager::Manager;
 use rumble::bluez::adapter::ConnectedAdapter;
 
 use rumble::api::{BDAddr, Central, CentralEvent, Peripheral};
-use rumble::api::CentralEvent::{DeviceDiscovered, DeviceUpdated};
+use rumble::api::CentralEvent::DeviceUpdated;
+
+use rumble::Error;
+
+// Temporary
+use rumble::api::{UUID, ValueNotification};
+const TARGET_CHARACTERISTIC_UUID: UUID =
+UUID::B128([0x6d, 0x66, 0x70, 0x44, 0x73, 0x66, 0x62, 0x75, 0x66, 0x45, 0x76, 0x64, 0x55, 0xaa, 0x6c, 0x22]);
 
 /// An implementation of a BleRepo using rumble crate
 pub struct RumbleBleRepo {
@@ -86,36 +92,100 @@ impl RumbleBleRepo {
         }));
 
         // Actually start the scan
-        self.adapter.start_scan();
+        self.adapter.start_scan().unwrap();
 
         while timeout > 0 && !scan_done.load(Ordering::Relaxed) {
             thread::sleep(Duration::from_secs(1));
             timeout -= 1;
         }
 
-        self.adapter.stop_scan();
+        self.adapter.stop_scan().unwrap();
+
+        thread::sleep(Duration::from_secs(1));
 
         return found_devices.lock().unwrap().clone().to_vec();
     }
 
-    /// Populate the device filter
+    /// Set the device filter
+    ///
+    /// Set the device filter with a function that return a bool and taking an address and a name as inputs.
     pub fn set_device_filter(&mut self, device_filter: fn([u8; 6], String) -> bool) {
         self.device_filter = Some(device_filter);
     }
 
-    /// Init the underlying adapter.
-    fn init_adapter(&mut self) {
-        let manager = Manager::new().unwrap();
+    /// Connect to a device.
+    ///
+    /// Connect to the device associated with provided address.
+    ///
+    /// # Arguments:
+    /// * `device_address` - The address of the device to connect.
+    ///
+    /// Returns true whether the connection succeeded, false otherwise.
+    ///
+    /// As for the current state of rumble library, we can't do more refactoring from this point since we can't store a Peripheral to operate on it later.
+    /// Therefore, and for now, we have to operate straight on.
+    pub fn connect(self, device_address: [u8; 6]) -> String {
+        let device = self.adapter.peripheral(BDAddr { address: device_address });
 
-        // Get the first adapter
-        let adapters = manager.adapters().unwrap();
-        let mut adapter = adapters.into_iter().nth(0).unwrap();
+        let result = match &device {
+            Some(_device) => true,
+            None => false
+        };
 
-        // Reset the adapter -- clears out any errant state
-        adapter = manager.down(&adapter).unwrap();
-        adapter = manager.up(&adapter).unwrap();
+        let result_str = Arc::new(Mutex::new(String::new()));
 
-        // Connect to adapter
-        self.adapter = Some(Arc::new(adapter.connect().unwrap()));
+        // If device found
+        if result {
+            match device.as_ref().unwrap().connect() {
+                Err(e) => {
+                    match e {
+                        Error::PermissionDenied => println!("Permission denied"),
+                        Error::DeviceNotFound => println!("Device not found"),
+                        Error::NotConnected => println!("Not connected"),
+                        Error::NotSupported(d) => println!("Not supported: {}", d),
+                        Error::TimedOut(d) => println!("Timed out: {}", d.as_secs()),
+                        Error::Other(d) => println!("Other: {}", d)
+                    }
+                    false
+                },
+                Ok(_s) => {
+                    let connected_device = device.unwrap();
+
+                    // Discover characteristics
+                    connected_device.discover_characteristics().unwrap();
+
+                    // Get characteristics
+                    let characs = connected_device.characteristics();
+
+                    // Get temperature characteristic
+                    let temperature_char = characs.iter().find(|c| c.uuid == TARGET_CHARACTERISTIC_UUID).unwrap();
+
+                    // Whether the hacaretristic has been read or not.
+                    let charac_read = Arc::new(AtomicBool::new(false));
+
+                    let charac_read_clone = charac_read.clone();
+                    let result_str_clone = result_str.clone();
+                    connected_device.on_notification(Box::new(move |n: ValueNotification| {
+                        result_str_clone.lock().unwrap().
+                            push_str(&String::from_utf8(n.value).unwrap());
+                        charac_read_clone.store(true, Ordering::Relaxed);
+                    }));
+
+                    connected_device.subscribe(temperature_char).unwrap();
+
+                    while charac_read.load(Ordering::Relaxed) == false {}
+
+                    connected_device.disconnect().unwrap();
+
+                    true
+                }
+            };
+        }
+        else
+        {
+            println!("No device found");
+        }
+
+        return result_str.lock().unwrap().to_string();
     }
 }
