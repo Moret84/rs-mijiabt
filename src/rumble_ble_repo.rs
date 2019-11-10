@@ -67,10 +67,9 @@ impl RumbleBleRepo {
                     Some(name) => name,
                 };
 
-                found_devices_clone.lock().unwrap().push(address.address);
-
                 if let Some(filter) = device_filter {
                     if (filter)(address.address, device_name) {
+                        found_devices_clone.lock().unwrap().push(address.address);
                         if stop_on_found {
                             scan_done_clone.store(true, Ordering::Relaxed);
                         }
