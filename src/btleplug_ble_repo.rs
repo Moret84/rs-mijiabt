@@ -1,34 +1,35 @@
-extern crate rumble;
+extern crate btleplug;
 
 use std::thread;
 use std::time::Duration;
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use rumble::bluez::manager::Manager;
-use rumble::bluez::adapter::ConnectedAdapter;
+use btleplug::bluez::manager::Manager;
+use btleplug::bluez::adapter::ConnectedAdapter;
 
-use rumble::api::{BDAddr, Central, CentralEvent, Peripheral};
-use rumble::api::CentralEvent::DeviceUpdated;
+use btleplug::api::{BDAddr, Central, CentralEvent, Peripheral};
+use btleplug::api::CentralEvent::DeviceUpdated;
 
-use rumble::Error;
+use btleplug::Error;
 
 // Temporary
-use rumble::api::{UUID, ValueNotification};
+use btleplug::api::{UUID, ValueNotification};
+
 const TARGET_CHARACTERISTIC_UUID: UUID =
 UUID::B128([0x6d, 0x66, 0x70, 0x44, 0x73, 0x66, 0x62, 0x75, 0x66, 0x45, 0x76, 0x64, 0x55, 0xaa, 0x6c, 0x22]);
 
-/// An implementation of a BleRepo using rumble crate
-pub struct RumbleBleRepo {
+/// An implementation of a BleRepo using btleplug crate
+pub struct BtleplugBleRepo {
     /// The reference to the underlying device adapter
     adapter: Arc<ConnectedAdapter>,
     /// The device filter to use, or not.
     device_filter: Option<fn([u8; 6], String) -> bool>,
 }
 
-impl RumbleBleRepo {
-    /// Return a new instance of a Rumble ble repo.
-    pub fn new() -> RumbleBleRepo {
+impl BtleplugBleRepo {
+    /// Return a new instance of a Btleplug ble repo.
+    pub fn new() -> BtleplugBleRepo {
         let manager = Manager::new().unwrap();
 
         // Get the first adapter
@@ -39,7 +40,7 @@ impl RumbleBleRepo {
         adapter = manager.down(&adapter).unwrap();
         adapter = manager.up(&adapter).unwrap();
 
-        RumbleBleRepo {
+        BtleplugBleRepo {
             adapter: Arc::new(adapter.connect().unwrap()),
             device_filter: None,
         }

@@ -5,4 +5,4 @@ authors = ["Aurélien Rivet <aurelienrivet@hotmail.fr>"]
 edition = "2018"
 
 [dependencies]
-rumble = "0.3.0"
+btleplug = "0.4.1"
