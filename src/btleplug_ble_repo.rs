@@ -9,7 +9,7 @@ use btleplug::bluez::manager::Manager;
 use btleplug::bluez::adapter::ConnectedAdapter;
 
 use btleplug::api::{BDAddr, Central, CentralEvent, Peripheral};
-use btleplug::api::CentralEvent::DeviceUpdated;
+use btleplug::api::CentralEvent::DeviceDiscovered;
 
 use btleplug::Error;
 
@@ -64,11 +64,12 @@ impl BtleplugBleRepo {
         let device_filter = self.device_filter;
         let scan_done_clone = scan_done.clone();
 
-        let on_device_updated = move |address: BDAddr| {
+        // Internal callback
+        let on_device_discovered = move |address: BDAddr| {
             let device_properties = adapter.clone().peripheral(address)
                 .unwrap().properties();
 
-            if device_properties.discovery_count == 2 {
+            if device_properties.discovery_count == 1 {
                 let device_name = match device_properties.local_name {
                     None => String::from("Unknown"),
                     Some(name) => name,
@@ -86,9 +87,8 @@ impl BtleplugBleRepo {
         };
 
         self.adapter.on_event(Box::new(move |event: CentralEvent| {
-            // If a DeviceUpdated event occured
-            if let DeviceUpdated(address) = event {
-                on_device_updated(address);
+            if let DeviceDiscovered(address) = event {
+                on_device_discovered(address);
             }
         }));
 
@@ -161,7 +161,7 @@ impl BtleplugBleRepo {
                     // Get temperature characteristic
                     let temperature_char = characs.iter().find(|c| c.uuid == TARGET_CHARACTERISTIC_UUID).unwrap();
 
-                    // Whether the hacaretristic has been read or not.
+                    // Whether the characteristic has been read or not.
                     let charac_read = Arc::new(AtomicBool::new(false));
 
                     let charac_read_clone = charac_read.clone();
