@@ -24,7 +24,7 @@ pub struct BtleplugBleRepo {
     /// The reference to the underlying device adapter
     adapter: Arc<ConnectedAdapter>,
     /// The device filter to use, or not.
-    device_filter: Option<fn([u8; 6], String) -> bool>,
+    device_filter: Option<fn(&[u8], String) -> bool>,
 }
 
 impl BtleplugBleRepo {
@@ -54,7 +54,6 @@ impl BtleplugBleRepo {
     /// * `timeout` - A timeout for the scan.
     /// * `stop_on_found` - Whether to stop when a device is found or not.
     pub fn scan(&self, mut timeout: u64, stop_on_found: bool) -> Vec<[u8; 6]> {
-
         let found_devices : Arc<Mutex<Vec<[u8; 6]>>> = Arc::new(Mutex::new(Vec::new()));
         let found_devices_clone = found_devices.clone();
 
@@ -76,8 +75,13 @@ impl BtleplugBleRepo {
                 };
 
                 if let Some(filter) = device_filter {
-                    if (filter)(address.address, device_name) {
+
+                    let mut device_address = address.address;
+                    device_address.reverse();
+
+                    if (filter)(&device_address, device_name) {
                         found_devices_clone.lock().unwrap().push(address.address);
+
                         if stop_on_found {
                             scan_done_clone.store(true, Ordering::Relaxed);
                         }
@@ -110,7 +114,7 @@ impl BtleplugBleRepo {
     /// Set the device filter
     ///
     /// Set the device filter with a function that return a bool and taking an address and a name as inputs.
-    pub fn set_device_filter(&mut self, device_filter: fn([u8; 6], String) -> bool) {
+    pub fn set_device_filter(&mut self, device_filter: fn(&[u8], String) -> bool) {
         self.device_filter = Some(device_filter);
     }
 
