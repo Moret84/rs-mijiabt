@@ -3,6 +3,7 @@ use dbus as dbus;
 use dbus::arg;
 use dbus::blocking;
 
+/// ADAPTER
 pub trait OrgBluezAdapter1 {
     fn start_discovery(&self) -> Result<(), dbus::Error>;
     fn set_discovery_filter(&self, properties: ::std::collections::HashMap<&str, arg::Variant<Box<dyn arg::RefArg>>>) -> Result<(), dbus::Error>;
@@ -130,6 +131,7 @@ impl<'a, C: ::std::ops::Deref<Target=blocking::Connection>> OrgBluezAdapter1 for
     }
 }
 
+/// DEVICE
 pub trait OrgBluezDevice1 {
     fn disconnect(&self) -> Result<(), dbus::Error>;
     fn connect(&self) -> Result<(), dbus::Error>;
@@ -279,4 +281,44 @@ impl<'a, C: ::std::ops::Deref<Target=blocking::Connection>> OrgBluezDevice1 for 
     fn set_blocked(&self, value: bool) -> Result<(), dbus::Error> {
         <Self as blocking::stdintf::org_freedesktop_dbus::Properties>::set(&self, "org.bluez.Device1", "Blocked", value)
     }
+}
+
+/// OBJECT MANAGER
+pub trait OrgFreedesktopDBusObjectManager {
+    fn get_managed_objects(&self) -> Result<::std::collections::HashMap<dbus::Path<'static>, ::std::collections::HashMap<String, ::std::collections::HashMap<String, arg::Variant<Box<dyn arg::RefArg + 'static>>>>>, dbus::Error>;
+}
+
+impl<'a, C: ::std::ops::Deref<Target=blocking::Connection>> OrgFreedesktopDBusObjectManager for blocking::Proxy<'a, C> {
+
+    fn get_managed_objects(&self) -> Result<::std::collections::HashMap<dbus::Path<'static>, ::std::collections::HashMap<String, ::std::collections::HashMap<String, arg::Variant<Box<dyn arg::RefArg + 'static>>>>>, dbus::Error> {
+        self.method_call("org.freedesktop.DBus.ObjectManager", "GetManagedObjects", ())
+            .and_then(|r: (::std::collections::HashMap<dbus::Path<'static>, ::std::collections::HashMap<String, ::std::collections::HashMap<String, arg::Variant<Box<dyn arg::RefArg + 'static>>>>>, )| Ok(r.0, ))
+    }
+}
+
+#[derive(Debug)]
+pub struct OrgFreedesktopDBusObjectManagerInterfacesAdded {
+    pub object: dbus::Path<'static>,
+    pub interfaces: ::std::collections::HashMap<String, ::std::collections::HashMap<String, arg::Variant<Box<dyn arg::RefArg + 'static>>>>,
+}
+
+impl arg::AppendAll for OrgFreedesktopDBusObjectManagerInterfacesAdded {
+    fn append(&self, i: &mut arg::IterAppend) {
+        arg::RefArg::append(&self.object, i);
+        arg::RefArg::append(&self.interfaces, i);
+    }
+}
+
+impl arg::ReadAll for OrgFreedesktopDBusObjectManagerInterfacesAdded {
+    fn read(i: &mut arg::Iter) -> Result<Self, arg::TypeMismatchError> {
+        Ok(OrgFreedesktopDBusObjectManagerInterfacesAdded {
+            object: i.read()?,
+            interfaces: i.read()?,
+        })
+    }
+}
+
+impl dbus::message::SignalArgs for OrgFreedesktopDBusObjectManagerInterfacesAdded {
+    const NAME: &'static str = "InterfacesAdded";
+    const INTERFACE: &'static str = "org.freedesktop.DBus.ObjectManager";
 }
