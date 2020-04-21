@@ -310,3 +310,15 @@ impl dbus::message::SignalArgs for OrgFreedesktopDBusObjectManagerInterfacesAdde
     const NAME: &'static str = "InterfacesAdded";
     const INTERFACE: &'static str = "org.freedesktop.DBus.ObjectManager";
 }
+
+pub trait OrgFreedesktopDBusObjectManager {
+    fn get_managed_objects(&self) -> Result<::std::collections::HashMap<dbus::Path<'static>, ::std::collections::HashMap<String, ::std::collections::HashMap<String, arg::Variant<Box<dyn arg::RefArg + 'static>>>>>, dbus::Error>;
+}
+
+impl<'a, C: ::std::ops::Deref<Target=blocking::SyncConnection>> OrgFreedesktopDBusObjectManager for blocking::Proxy<'a, C> {
+
+    fn get_managed_objects(&self) -> Result<::std::collections::HashMap<dbus::Path<'static>, ::std::collections::HashMap<String, ::std::collections::HashMap<String, arg::Variant<Box<dyn arg::RefArg + 'static>>>>>, dbus::Error> {
+        self.method_call("org.freedesktop.DBus.ObjectManager", "GetManagedObjects", ())
+            .and_then(|r: (::std::collections::HashMap<dbus::Path<'static>, ::std::collections::HashMap<String, ::std::collections::HashMap<String, arg::Variant<Box<dyn arg::RefArg + 'static>>>>>, )| Ok(r.0, ))
+    }
+}
