@@ -31,7 +31,7 @@ pub trait OrgBluezAdapter1 {
     fn modalias(&self) -> Result<String, dbus::Error>;
 }
 
-impl<'a, C: ::std::ops::Deref<Target=blocking::Connection>> OrgBluezAdapter1 for blocking::Proxy<'a, C> {
+impl<'a, C: ::std::ops::Deref<Target=blocking::SyncConnection>> OrgBluezAdapter1 for blocking::Proxy<'a, C> {
 
     fn start_discovery(&self) -> Result<(), dbus::Error> {
         self.method_call("org.bluez.Adapter1", "StartDiscovery", ())
@@ -164,7 +164,7 @@ pub trait OrgBluezDevice1 {
     fn services_resolved(&self) -> Result<bool, dbus::Error>;
 }
 
-impl<'a, C: ::std::ops::Deref<Target=blocking::Connection>> OrgBluezDevice1 for blocking::Proxy<'a, C> {
+impl<'a, C: ::std::ops::Deref<Target=blocking::SyncConnection>> OrgBluezDevice1 for blocking::Proxy<'a, C> {
 
     fn disconnect(&self) -> Result<(), dbus::Error> {
         self.method_call("org.bluez.Device1", "Disconnect", ())
