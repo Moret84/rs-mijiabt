@@ -135,7 +135,6 @@ impl DbusBleRepo {
 
         thread::spawn({
             let connection = dbus_ble_repo.dbus_connection.clone();
-            println!("thread spawn connection: {}", connection.lock().unwrap().unique_name());
             move || {
             loop {
                 connection.lock().unwrap().process(Duration::from_secs(1));
@@ -148,7 +147,6 @@ impl DbusBleRepo {
 
     pub fn start_scan(&self) {
         let connection = self.dbus_connection.lock().unwrap();
-        //self.dbus_connection.lock().unwrap()
         connection
             .with_proxy(BLUEZ_DBUS_DESTINATION, "/org/bluez/hci0", STANDARD_TIMEOUT)
             .start_discovery().expect("Error starting discovery");
@@ -220,7 +218,6 @@ impl DbusBleRepo {
             let on_device_found = self.on_device_found;
             let found_devices_clone = self.found_devices.clone();
             move | p: PropertiesPropertiesChanged, _: &SyncConnection, m: &Message | {
-                println!("{:#?}", p);
                 if p.interface_name == BLUEZ_DBUS_DEVICE_INTERFACE {
                     let mut devices = found_devices_clone.lock().unwrap();
 
