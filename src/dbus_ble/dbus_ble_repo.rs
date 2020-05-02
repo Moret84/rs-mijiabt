@@ -24,19 +24,24 @@ static DBUS_CONNECTION_TIMEOUT: Duration = Duration::from_millis(DBUS_CONNECTION
 static DBUS_CONNECTION_PROCESS_TIMEOUT: Duration = Duration::from_millis(DBUS_CONNECTION_PROCESS_TIMEOUT_MS);
 static DBUS_CONNECTION_PROCESS_PERIOD: Duration = Duration::from_millis(DBUS_CONNECTION_PROCESS_PERIOD_MS);
 
+/// A ble repo using Dbus.
+/// It allows to access bluetooth using bluez dbus api.
 pub struct DbusBleRepo {
+    /// The underlying dbus connection.
     dbus_connection: Arc<Mutex<SyncConnection>>,
+    /// The list of cached found_devices.
     found_devices : Arc<Mutex<Vec<BleDevice>>>,
+    /// The on device found callback.
     on_device_found: Option<fn(&BleDevice)>,
+    /// The token to the interface added match rule. Allows to delete it when needed.
     interface_added_match_rule_token: Option<Token>,
-    properties_changed_match_rule_token: Option<Token>,
-
+    /// The token to the properties changed match rule. Allows to delete it when needed.
+    properties_changed_match_rule_token: Option<Token>
 }
 
 impl DbusBleRepo {
     /// Return a new instance of a Dbus ble repo.
     pub fn new() -> DbusBleRepo {
-
         let connection = SyncConnection::new_system().expect("Error getting dbus connection");
 
         let mut dbus_ble_repo = DbusBleRepo {
@@ -78,24 +83,29 @@ impl DbusBleRepo {
         dbus_ble_repo
     }
 
+    /// Start the ble scan.
     pub fn start_scan(&self) {
         self.dbus_connection.lock().unwrap()
             .with_proxy(BLUEZ_DBUS_DESTINATION, "/org/bluez/hci0", DBUS_CONNECTION_TIMEOUT)
             .start_discovery().expect("Error starting discovery");
     }
 
+    /// Stop the ble scan.
     pub fn stop_scan(&self) {
         self.dbus_connection.lock().unwrap()
             .with_proxy(BLUEZ_DBUS_DESTINATION, "/org/bluez/hci0", DBUS_CONNECTION_TIMEOUT)
             .stop_discovery().expect("Error stopping discovery");
     }
 
+    /// Set the on device discovered callback.
     pub fn set_on_device_discovered_cb(&mut self, callback: Option<fn(&BleDevice)>) {
         self.on_device_found = callback;
         self.add_interface_added_match_rule();
         self.add_properties_changed_match_rule();
     }
 
+    /// Add the interface added match rule to the connection.
+    /// Replaces the existing match rule with a new.
     fn add_interface_added_match_rule(&mut self) {
         let mut interface_added_match_rule = MatchRule::new();
         interface_added_match_rule.interface = Option::Some(Interface::new("org.freedesktop.DBus.ObjectManager").unwrap());
@@ -140,6 +150,8 @@ impl DbusBleRepo {
         );
     }
 
+    /// Add the properties changed match rule to the connection.
+    /// Replaces the existing match rule with a new.
     fn add_properties_changed_match_rule(&mut self) {
         let mut properties_changed_match_rule = MatchRule::new();
         properties_changed_match_rule.interface = Option::Some(Interface::new("org.freedesktop.DBus.Properties").unwrap());
