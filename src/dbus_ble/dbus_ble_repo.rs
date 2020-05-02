@@ -15,8 +15,12 @@ use crate::dbus_ble::bluez_dbus::{OrgBluezAdapter1, OrgFreedesktopDBusObjectMana
 const BLUEZ_DBUS_DESTINATION: &str = "org.bluez";
 const BLUEZ_DBUS_DEVICE_INTERFACE: &str = "org.bluez.Device1";
 const DBUS_CONNECTION_TIMEOUT_MS: u64 = 5000;
+const DBUS_CONNECTION_PROCESS_TIMEOUT_MS: u64 = 1000;
+const DBUS_CONNECTION_PROCESS_PERIOD_MS: u64 = 50;
 
-static STANDARD_TIMEOUT: Duration = Duration::from_millis(DBUS_CONNECTION_TIMEOUT_MS);
+static DBUS_CONNECTION_TIMEOUT: Duration = Duration::from_millis(DBUS_CONNECTION_TIMEOUT_MS);
+static DBUS_CONNECTION_PROCESS_TIMEOUT: Duration = Duration::from_millis(DBUS_CONNECTION_PROCESS_TIMEOUT_MS);
+static DBUS_CONNECTION_PROCESS_PERIOD: Duration = Duration::from_millis(DBUS_CONNECTION_PROCESS_PERIOD_MS);
 
 pub struct BleDevice {
     pub path: String,
@@ -122,7 +126,7 @@ impl DbusBleRepo {
         dbus_ble_repo.add_properties_changed_match_rule();
 
         let managed_objects = dbus_ble_repo.dbus_connection.lock().unwrap()
-            .with_proxy(BLUEZ_DBUS_DESTINATION, "/", STANDARD_TIMEOUT)
+            .with_proxy(BLUEZ_DBUS_DESTINATION, "/", DBUS_CONNECTION_TIMEOUT)
             .get_managed_objects().unwrap();
 
         for (path, payload) in &managed_objects {
@@ -138,10 +142,10 @@ impl DbusBleRepo {
             move || {
                 loop {
                     if let Ok(mut connection) = connection.try_lock() {
-                        connection.process(Duration::from_millis(1000));
+                        connection.process(DBUS_CONNECTION_PROCESS_TIMEOUT);
                     }
 
-                    thread::sleep(Duration::from_millis(500));
+                    thread::sleep(DBUS_CONNECTION_PROCESS_PERIOD);
                 }
             }
         });
@@ -150,16 +154,14 @@ impl DbusBleRepo {
     }
 
     pub fn start_scan(&self) {
-        let connection = self.dbus_connection.lock().unwrap();
-        connection
-            .with_proxy(BLUEZ_DBUS_DESTINATION, "/org/bluez/hci0", STANDARD_TIMEOUT)
+        self.dbus_connection.lock().unwrap()
+            .with_proxy(BLUEZ_DBUS_DESTINATION, "/org/bluez/hci0", DBUS_CONNECTION_TIMEOUT)
             .start_discovery().expect("Error starting discovery");
     }
 
     pub fn stop_scan(&self) {
-        let connection = self.dbus_connection.lock().unwrap();
-        connection
-            .with_proxy(BLUEZ_DBUS_DESTINATION, "/org/bluez/hci0", STANDARD_TIMEOUT)
+        self.dbus_connection.lock().unwrap()
+            .with_proxy(BLUEZ_DBUS_DESTINATION, "/org/bluez/hci0", DBUS_CONNECTION_TIMEOUT)
             .stop_discovery().expect("Error stopping discovery");
     }
 
