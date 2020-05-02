@@ -5,11 +5,11 @@ use std::thread;
 
 use dbus::arg::{RefArg, Variant};
 use dbus::blocking::SyncConnection;
-use dbus::blocking::stdintf::org_freedesktop_dbus::PropertiesPropertiesChanged;
+use dbus::blocking::stdintf::org_freedesktop_dbus::{PropertiesPropertiesChanged, ObjectManagerInterfacesAdded};
 use dbus::message::{MatchRule, MessageType, Message};
 use dbus::strings::{Interface, Member};
 
-use crate::dbus_ble::bluez_dbus::{OrgBluezAdapter1, OrgFreedesktopDBusObjectManagerInterfacesAdded, OrgFreedesktopDBusObjectManager};
+use crate::dbus_ble::bluez_dbus::{OrgBluezAdapter1, OrgFreedesktopDBusObjectManager};
 
 const BLUEZ_DBUS_DESTINATION: &str = "org.bluez";
 const BLUEZ_DBUS_DEVICE_INTERFACE: &str = "org.bluez.Device1";
@@ -167,7 +167,7 @@ impl DbusBleRepo {
         let on_interface_added = {
             let on_device_found = self.on_device_found;
             let found_devices_clone = self.found_devices.clone();
-            move | p: OrgFreedesktopDBusObjectManagerInterfacesAdded, c: &SyncConnection, m: &Message| {
+            move | p: ObjectManagerInterfacesAdded, _: &SyncConnection, _: &Message| {
                 // If this is a ble device which has been discovered
                 if p.interfaces.contains_key(BLUEZ_DBUS_DEVICE_INTERFACE) {
                     let mut devices = found_devices_clone.lock().unwrap();
