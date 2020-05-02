@@ -7,4 +7,3 @@ edition = "2018"
 [dependencies]
 btleplug = "0.4.1"
 dbus = "0.8.2"
-#btleplug = { path = "../btleplug" }
