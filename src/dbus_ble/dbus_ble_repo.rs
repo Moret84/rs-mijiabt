@@ -6,6 +6,7 @@ use std::thread;
 use dbus::arg::{RefArg, Variant};
 use dbus::blocking::SyncConnection;
 use dbus::blocking::stdintf::org_freedesktop_dbus::{PropertiesPropertiesChanged, ObjectManagerInterfacesAdded};
+use dbus::channel::Token;
 use dbus::message::{MatchRule, MessageType, Message};
 use dbus::strings::{Interface, Member};
 
@@ -97,7 +98,10 @@ impl BleDevice {
 pub struct DbusBleRepo {
     dbus_connection: Arc<Mutex<SyncConnection>>,
     found_devices : Arc<Mutex<Vec<BleDevice>>>,
-    on_device_found: Option<fn(&BleDevice)>
+    on_device_found: Option<fn(&BleDevice)>,
+    interface_added_match_rule_token: Option<Token>,
+    properties_changed_match_rule_token: Option<Token>,
+
 }
 
 impl DbusBleRepo {
@@ -106,10 +110,12 @@ impl DbusBleRepo {
 
         let connection = SyncConnection::new_system().expect("Error getting dbus connection");
 
-        let dbus_ble_repo = DbusBleRepo {
+        let mut dbus_ble_repo = DbusBleRepo {
             dbus_connection: Arc::new(Mutex::new(connection)),
             found_devices: Arc::new(Mutex::new(Vec::new())),
-            on_device_found: None
+            on_device_found: None,
+            interface_added_match_rule_token: None,
+            properties_changed_match_rule_token: None,
         };
 
         dbus_ble_repo.add_interface_added_match_rule();
@@ -156,9 +162,11 @@ impl DbusBleRepo {
 
     pub fn set_on_device_discovered_cb(&mut self, callback: Option<fn(&BleDevice)>) {
         self.on_device_found = callback;
+        self.add_interface_added_match_rule();
+        self.add_properties_changed_match_rule();
     }
 
-    fn add_interface_added_match_rule(&self) {
+    fn add_interface_added_match_rule(&mut self) {
         let mut interface_added_match_rule = MatchRule::new();
         interface_added_match_rule.interface = Option::Some(Interface::new("org.freedesktop.DBus.ObjectManager").unwrap());
         interface_added_match_rule.msg_type = Option::Some(MessageType::Signal);
@@ -190,10 +198,19 @@ impl DbusBleRepo {
             }
         };
 
-        self.dbus_connection.lock().unwrap().add_match(interface_added_match_rule, on_interface_added).unwrap();
+        let dbus_connection = self.dbus_connection.lock().unwrap();
+
+        match self.interface_added_match_rule_token {
+            None => (),
+            Some(token) => dbus_connection.remove_match(token).unwrap()
+        }
+
+        self.interface_added_match_rule_token = Some(dbus_connection
+            .add_match(interface_added_match_rule, on_interface_added).unwrap()
+        );
     }
 
-    fn add_properties_changed_match_rule(&self) {
+    fn add_properties_changed_match_rule(&mut self) {
         let mut properties_changed_match_rule = MatchRule::new();
         properties_changed_match_rule.interface = Option::Some(Interface::new("org.freedesktop.DBus.Properties").unwrap());
         properties_changed_match_rule.msg_type = Option::Some(MessageType::Signal);
@@ -222,6 +239,15 @@ impl DbusBleRepo {
             }
         };
 
-        self.dbus_connection.lock().unwrap().add_match(properties_changed_match_rule, on_properties_changed).unwrap();
+        let dbus_connection = self.dbus_connection.lock().unwrap();
+
+        match self.properties_changed_match_rule_token {
+            None => (),
+            Some(token) => dbus_connection.remove_match(token).unwrap()
+        }
+
+        self.properties_changed_match_rule_token = Some(dbus_connection
+            .add_match(properties_changed_match_rule, on_properties_changed).unwrap()
+        );
     }
 }
