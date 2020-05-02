@@ -182,7 +182,7 @@ impl DbusBleRepo {
                 // If this is a ble device which has been discovered
                 if p.interfaces.contains_key(BLUEZ_DBUS_DEVICE_INTERFACE) {
                     let mut devices = found_devices_clone.lock().unwrap();
-                    let path = m.path().unwrap().to_string();
+                    let path = p.object.to_string();
 
                     if let Some(device) = devices.iter_mut().find(|d| d.path == path) {
                         device.update_service_data(&p.interfaces[BLUEZ_DBUS_DEVICE_INTERFACE]);
