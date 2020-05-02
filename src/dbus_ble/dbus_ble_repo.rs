@@ -136,11 +136,15 @@ impl DbusBleRepo {
         thread::spawn({
             let connection = dbus_ble_repo.dbus_connection.clone();
             move || {
-            loop {
-                connection.lock().unwrap().process(Duration::from_secs(1));
-                thread::sleep(Duration::from_secs(1));
+                loop {
+                    if let Ok(mut connection) = connection.try_lock() {
+                        connection.process(Duration::from_millis(1000));
+                    }
+
+                    thread::sleep(Duration::from_millis(500));
+                }
             }
-        }});
+        });
 
         dbus_ble_repo
     }
@@ -153,7 +157,8 @@ impl DbusBleRepo {
     }
 
     pub fn stop_scan(&self) {
-        self.dbus_connection.lock().unwrap()
+        let connection = self.dbus_connection.lock().unwrap();
+        connection
             .with_proxy(BLUEZ_DBUS_DESTINATION, "/org/bluez/hci0", STANDARD_TIMEOUT)
             .stop_discovery().expect("Error stopping discovery");
     }
@@ -189,7 +194,7 @@ impl DbusBleRepo {
                             Some(on_device_found) => on_device_found(&device)
                         }
 
-                        found_devices_clone.lock().unwrap().push(device);
+                        devices.push(device);
                     }
                 }
                 true
