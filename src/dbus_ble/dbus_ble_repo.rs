@@ -12,6 +12,8 @@ use dbus::strings::{Interface, Member};
 
 use crate::dbus_ble::bluez_dbus::{OrgBluezAdapter1, OrgFreedesktopDBusObjectManager};
 
+use crate::api::BleDevice;
+
 const BLUEZ_DBUS_DESTINATION: &str = "org.bluez";
 const BLUEZ_DBUS_DEVICE_INTERFACE: &str = "org.bluez.Device1";
 const DBUS_CONNECTION_TIMEOUT_MS: u64 = 5000;
@@ -21,83 +23,6 @@ const DBUS_CONNECTION_PROCESS_PERIOD_MS: u64 = 50;
 static DBUS_CONNECTION_TIMEOUT: Duration = Duration::from_millis(DBUS_CONNECTION_TIMEOUT_MS);
 static DBUS_CONNECTION_PROCESS_TIMEOUT: Duration = Duration::from_millis(DBUS_CONNECTION_PROCESS_TIMEOUT_MS);
 static DBUS_CONNECTION_PROCESS_PERIOD: Duration = Duration::from_millis(DBUS_CONNECTION_PROCESS_PERIOD_MS);
-
-pub struct BleDevice {
-    pub path: String,
-    pub local_name: String,
-    pub service_data: HashMap<String, Vec<u8>>
-}
-
-impl BleDevice {
-    /// Constructs a new ble device abstraction.
-    ///
-    /// # Arguments:
-    /// * `input_message` - The input raw message
-    /// * `input_interface` - The input dictionary that match the org.bluez.Device1 interface
-    ///
-    /// Returns a high level representation of a ble device.
-    pub fn new(device_path: String, input_interface: &HashMap<String, Variant<Box<dyn RefArg>>>) -> BleDevice {
-        let mut local_name = String::from("<unknown>");
-        if input_interface.contains_key("Alias") {
-            match input_interface["Alias"].as_str() {
-                None => (),
-                Some(name) => local_name = String::from(name)
-            }
-        }
-
-        let path = device_path;
-
-        let service_data = Self::parse_service_data(&input_interface);
-
-        BleDevice {
-            path,
-            local_name,
-            service_data
-        }
-    }
-
-    /// Update service data with new values.
-    ///
-    /// # Arguments:
-    /// * `update_data` - The updated input raw data.
-    ///
-    fn update_service_data(&mut self, update_data: &HashMap<String, Variant<Box<dyn RefArg>>>) {
-        self.service_data = Self::parse_service_data(update_data);
-    }
-
-    /// Parse service data.
-    ///
-    /// # Arguments:
-    /// * `input` - The input raw data.
-    ///
-    /// Returns a rust representation of data.
-    ///
-    fn parse_service_data(input: &HashMap<String, Variant<Box<dyn RefArg>>>) -> HashMap<String, Vec<u8>> {
-        let mut output_data : HashMap<String, Vec<u8>> = HashMap::new();
-        if input.contains_key("ServiceData") {
-            let service_data = &input["ServiceData"].0;
-            let mut service_data_iter = service_data.as_iter().unwrap();
-
-            while let Some(key) = service_data_iter.next() {
-                key.as_str().unwrap();
-
-                let mut raw_data : Vec<u8> = Vec::new();
-                let value = service_data_iter.next().unwrap();
-                let inner_value = value.as_iter().unwrap().next().unwrap();
-                for b in inner_value.as_iter().unwrap() {
-                    match b.as_u64() {
-                        None => (),
-                        Some(b) => raw_data.push(b as u8)
-                    }
-                }
-
-                output_data.insert(String::from(key.as_str().unwrap()), raw_data);
-            }
-
-        }
-        output_data
-    }
-}
 
 pub struct DbusBleRepo {
     dbus_connection: Arc<Mutex<SyncConnection>>,

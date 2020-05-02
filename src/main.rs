@@ -4,6 +4,8 @@ use btleplug_ble_repo::BtleplugBleRepo;
 mod dbus_ble;
 use dbus_ble::dbus_ble_repo::DbusBleRepo;
 
+mod api;
+
 use std::thread;
 use std::time::Duration;
 
