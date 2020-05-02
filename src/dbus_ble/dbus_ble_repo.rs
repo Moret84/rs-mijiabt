@@ -132,7 +132,7 @@ impl DbusBleRepo {
         for (path, payload) in &managed_objects {
             if payload.contains_key(BLUEZ_DBUS_DEVICE_INTERFACE) {
                 let path = path.to_string();
-                let ble_device = BleDevice::new(path, &payload[BLUEZ_DBUS_DEVICE_INTERFACE]);
+                let ble_device = Self::get_ble_device(path, &payload[BLUEZ_DBUS_DEVICE_INTERFACE]);
                 dbus_ble_repo.found_devices.lock().unwrap().push(ble_device);
             }
         }
@@ -187,9 +187,9 @@ impl DbusBleRepo {
                     let path = p.object.to_string();
 
                     if let Some(device) = devices.iter_mut().find(|d| d.path == path) {
-                        device.update_service_data(&p.interfaces[BLUEZ_DBUS_DEVICE_INTERFACE]);
+                        device.service_data = Self::parse_service_data(&p.interfaces[BLUEZ_DBUS_DEVICE_INTERFACE]);
                     } else {
-                        let device = BleDevice::new(path, &p.interfaces[BLUEZ_DBUS_DEVICE_INTERFACE]);
+                        let device = Self::get_ble_device(path, &p.interfaces[BLUEZ_DBUS_DEVICE_INTERFACE]);
 
                         match on_device_found {
                             None => (),
@@ -231,7 +231,7 @@ impl DbusBleRepo {
                     let path = m.path().unwrap().to_string();
 
                     if let Some(device) = devices.iter_mut().find(|d| d.path == path) {
-                        device.update_service_data(&p.changed_properties);
+                        device.service_data = Self::parse_service_data(&p.changed_properties);
 
                         match on_device_found {
                             None => (),
@@ -253,5 +253,64 @@ impl DbusBleRepo {
         self.properties_changed_match_rule_token = Some(dbus_connection
             .add_match(properties_changed_match_rule, on_properties_changed).unwrap()
         );
+    }
+
+    /// Constructs a new ble device abstraction from dbus data.
+    ///
+    /// # Arguments:
+    /// * `input_message` - The input raw message from dbus.
+    /// * `input_interface` - The input dictionary that match the org.bluez.Device1 interface
+    ///
+    /// Returns a high level representation of a ble device.
+    fn get_ble_device(device_path: String, input_interface: &HashMap<String, Variant<Box<dyn RefArg>>>) -> BleDevice {
+        let mut local_name = String::from("<unknown>");
+        if input_interface.contains_key("Alias") {
+            match input_interface["Alias"].as_str() {
+                None => (),
+                Some(name) => local_name = String::from(name)
+            }
+        }
+
+        let path = device_path;
+
+        let service_data = Self::parse_service_data(&input_interface);
+
+        BleDevice {
+            path,
+            local_name,
+            service_data
+        }
+    }
+
+    /// Parse service data.
+    ///
+    /// # Arguments:
+    /// * `input` - The input raw data.
+    ///
+    /// Returns a rust representation of data.
+    fn parse_service_data(input: &HashMap<String, Variant<Box<dyn RefArg>>>) -> HashMap<String, Vec<u8>> {
+        let mut output_data : HashMap<String, Vec<u8>> = HashMap::new();
+        if input.contains_key("ServiceData") {
+            let service_data = &input["ServiceData"].0;
+            let mut service_data_iter = service_data.as_iter().unwrap();
+
+            while let Some(key) = service_data_iter.next() {
+                key.as_str().unwrap();
+
+                let mut raw_data : Vec<u8> = Vec::new();
+                let value = service_data_iter.next().unwrap();
+                let inner_value = value.as_iter().unwrap().next().unwrap();
+                for b in inner_value.as_iter().unwrap() {
+                    match b.as_u64() {
+                        None => (),
+                        Some(b) => raw_data.push(b as u8)
+                    }
+                }
+
+                output_data.insert(String::from(key.as_str().unwrap()), raw_data);
+            }
+
+        }
+        output_data
     }
 }
