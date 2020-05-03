@@ -1,9 +1,12 @@
 use crate::ble::api::BleDevice;
-
 use crate::ble::dbus::dbus_ble_repo::DbusBleRepo;
 
-use std::sync::atomic::{AtomicU16, Ordering};
+use ctrlc;
+
+use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
 use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::{Duration, Instant};
 
 const TARGET_DEVICE_NAME: &str = "MJ_HT_V1";
 const TARGET_SERVICE_UUID: &str = "0000fe95-0000-1000-8000-00805f9b34fb";
@@ -12,6 +15,7 @@ pub struct MijiaBt {
     ble_repo: DbusBleRepo,
     current_data: Arc<(AtomicU16, AtomicU16)>,
     on_data_updated: Arc<Mutex<Option<Box<dyn FnMut((u16, u16)) + Send + Sync + 'static>>>>,
+    listening: Arc<AtomicBool>
 }
 
 impl MijiaBt {
@@ -20,20 +24,45 @@ impl MijiaBt {
         let mijia_bt = MijiaBt {
             ble_repo: DbusBleRepo::new(),
             current_data: Arc::new((AtomicU16::new(0), AtomicU16::new(0))),
-            on_data_updated: Arc::new(Mutex::new(None))
+            on_data_updated: Arc::new(Mutex::new(None)),
+            listening: Arc::new(AtomicBool::new(false))
         };
+
+        ctrlc::set_handler({
+            let listening = mijia_bt.listening.clone();
+            move || {
+                listening.store(false, Ordering::SeqCst);
+                println!("SIGINT received. Exiting...");
+            }
+        }).expect("Error setting Ctrl-C handler");
 
         mijia_bt
     }
 
     /// Start listening the mijia bt sensor.
-    pub fn start_listening(&self) {
-        self.ble_repo.start_scan();
-    }
+    ///
+    /// # Arguments:
+    /// * `timeout` - The time in seconds to listen the bt sensor.
+    ///               If None is passed, the program waits forever.
+    ///               It can anywya be interrupted using Ctrl-C.
+    pub fn start_listening(&self, timeout: Option<u64>) {
+        println!("Start listening the mijia bt sensor...\n\
+                 Ctrl-C to stop");
 
-    /// Stop listening the mijia bt sensor.
-    pub fn stop_listening(&self) {
-        self.ble_repo.stop_scan();
+        self.ble_repo.start_scan();
+        self.listening.store(true, Ordering::SeqCst);
+
+        let now = Instant::now();
+
+        while self.listening.load(Ordering::SeqCst) {
+            thread::sleep(Duration::from_millis(20));
+
+            if let Some(timeout) = timeout {
+                if now.elapsed().as_secs() >= timeout {
+                    self.listening.store(false, Ordering::SeqCst);
+                }
+            }
+        }
     }
 
     /// Set the on data updated callback.
@@ -106,5 +135,11 @@ impl MijiaBt {
         }
 
         (temperature, humidity)
+    }
+}
+
+impl Drop for MijiaBt {
+    fn drop(&mut self) {
+        self.ble_repo.stop_scan();
     }
 }

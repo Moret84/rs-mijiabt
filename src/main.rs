@@ -12,13 +12,5 @@ fn main() {
         println!("Temperature: {}, Humidity: {}", mijiabt_data.0, mijiabt_data.1);
     }));
 
-    mijia_bt.start_listening();
-
-    let mut i = 30;
-    while i >= 0 {
-        thread::sleep(Duration::from_secs(1));
-        i = i -1;
-    }
-
-    mijia_bt.stop_listening();
+    mijia_bt.start_listening(None);
 }
