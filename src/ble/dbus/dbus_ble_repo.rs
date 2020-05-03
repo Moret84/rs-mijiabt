@@ -92,9 +92,16 @@ impl DbusBleRepo {
 
     /// Stop the ble scan.
     pub fn stop_scan(&self) {
-        self.dbus_connection.lock().unwrap()
+        let connection = self.dbus_connection.lock().unwrap();
+        let is_discovering = connection
             .with_proxy(BLUEZ_DBUS_DESTINATION, "/org/bluez/hci0", DBUS_CONNECTION_TIMEOUT)
-            .stop_discovery().expect("Error stopping discovery");
+            .discovering().unwrap();
+
+        if is_discovering {
+            connection
+                .with_proxy(BLUEZ_DBUS_DESTINATION, "/org/bluez/hci0", DBUS_CONNECTION_TIMEOUT)
+                .stop_discovery().expect("Error stopping discovery");
+        }
     }
 
     /// Set the on advertisement data callback.
