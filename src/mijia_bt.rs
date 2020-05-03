@@ -1,6 +1,6 @@
-use crate::api::BleDevice;
+use crate::ble::api::BleDevice;
 
-use crate::dbus_ble::dbus_ble_repo::DbusBleRepo;
+use crate::ble::dbus::dbus_ble_repo::DbusBleRepo;
 
 use std::sync::atomic::{AtomicU16, Ordering};
 use std::sync::{Arc, Mutex};

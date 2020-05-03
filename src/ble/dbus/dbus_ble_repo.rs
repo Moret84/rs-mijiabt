@@ -10,9 +10,9 @@ use dbus::channel::Token;
 use dbus::message::{MatchRule, MessageType, Message};
 use dbus::strings::{Interface, Member};
 
-use crate::dbus_ble::bluez_dbus::{OrgBluezAdapter1, OrgFreedesktopDBusObjectManager};
+use crate::ble::dbus::bluez_dbus::{OrgBluezAdapter1, OrgFreedesktopDBusObjectManager};
 
-use crate::api::BleDevice;
+use crate::ble::api::BleDevice;
 
 const BLUEZ_DBUS_DESTINATION: &str = "org.bluez";
 const BLUEZ_DBUS_DEVICE_INTERFACE: &str = "org.bluez.Device1";

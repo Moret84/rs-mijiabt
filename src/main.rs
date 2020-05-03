@@ -1,6 +1,5 @@
-mod api;
-mod dbus_ble;
 mod mijia_bt;
+mod ble;
 
 use mijia_bt::MijiaBt;
 
