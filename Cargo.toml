@@ -1,5 +1,5 @@
 [package]
-name = "ble_temp"
+name = "mijiabt"
 version = "0.1.0"
 authors = ["Aurélien Rivet <aurelienrivet@hotmail.fr>"]
 edition = "2018"
