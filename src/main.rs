@@ -38,11 +38,11 @@ fn btleplug_test() {
 
 fn dbus_test() {
     let mut dbus_ble_repo = DbusBleRepo::new();
-    dbus_ble_repo.set_on_device_discovered_cb(Some(|device| {
+    dbus_ble_repo.set_on_device_discovered_cb(|device| {
         println!("{}", device.path);
         println!("{}", device.local_name);
         println!("{:#?}", device.service_data);
-    }));
+    });
 
     dbus_ble_repo.start_scan();
 
