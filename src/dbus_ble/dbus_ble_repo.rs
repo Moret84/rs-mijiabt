@@ -32,7 +32,7 @@ pub struct DbusBleRepo {
     /// The list of cached found_devices.
     found_devices : Arc<Mutex<Vec<BleDevice>>>,
     /// The on device found callback.
-    on_device_found: Arc<Mutex<Box<dyn FnMut(&BleDevice) + Send + Sync + 'static>>>,
+    on_advertisement_data: Arc<Mutex<Box<dyn FnMut(&BleDevice) + Send + Sync + 'static>>>,
     /// The token to the interface added match rule. Allows to delete it when needed.
     interface_added_match_rule_token: Option<Token>,
     /// The token to the properties changed match rule. Allows to delete it when needed.
@@ -47,7 +47,7 @@ impl DbusBleRepo {
         let mut dbus_ble_repo = DbusBleRepo {
             dbus_connection: Arc::new(Mutex::new(connection)),
             found_devices: Arc::new(Mutex::new(Vec::new())),
-            on_device_found: Arc::new(Mutex::new(Box::new(|device| {}))),
+            on_advertisement_data: Arc::new(Mutex::new(Box::new(|device| {}))),
             interface_added_match_rule_token: None,
             properties_changed_match_rule_token: None,
         };
@@ -97,9 +97,13 @@ impl DbusBleRepo {
             .stop_discovery().expect("Error stopping discovery");
     }
 
-    /// Set the on device discovered callback.
-    pub fn set_on_device_discovered_cb(&mut self, callback: impl Fn(&BleDevice)+ Send + Sync + 'static) {
-        self.on_device_found = Arc::new(Mutex::new(Box::new(callback)));
+    /// Set the on advertisement data callback.
+    ///
+    /// # Arguments:
+    /// * `callback` - The callback to call when a new advertisement record is found.
+    ///                The callback take a reference on a High level BleDevice abstraction as parameter.
+    pub fn set_on_advertisement_data_callback(&mut self, callback: impl FnMut(&BleDevice)+ Send + Sync + 'static) {
+        self.on_advertisement_data = Arc::new(Mutex::new(Box::new(callback)));
         self.add_interface_added_match_rule();
         self.add_properties_changed_match_rule();
     }
@@ -113,7 +117,7 @@ impl DbusBleRepo {
         interface_added_match_rule.member = Option::Some(Member::new("InterfacesAdded").unwrap());
 
         let on_interface_added = {
-            let on_device_found = self.on_device_found.clone();
+            let on_advertisement_data = self.on_advertisement_data.clone();
             let found_devices_clone = self.found_devices.clone();
             move | p: ObjectManagerInterfacesAdded, _: &SyncConnection, _: &Message| {
                 // If this is a ble device which has been discovered
@@ -126,7 +130,7 @@ impl DbusBleRepo {
                     } else {
                         let device = Self::get_ble_device(path, &p.interfaces[BLUEZ_DBUS_DEVICE_INTERFACE]);
 
-                        (&mut *on_device_found.lock().unwrap())(&device);
+                        (&mut *on_advertisement_data.lock().unwrap())(&device);
 
                         devices.push(device);
                     }
@@ -156,7 +160,7 @@ impl DbusBleRepo {
         properties_changed_match_rule.member = Option::Some(Member::new("PropertiesChanged").unwrap());
 
         let on_properties_changed = {
-            let on_device_found = self.on_device_found.clone();
+            let on_advertisement_data = self.on_advertisement_data.clone();
             let found_devices_clone = self.found_devices.clone();
             move | p: PropertiesPropertiesChanged, _: &SyncConnection, m: &Message | {
                 if p.interface_name == BLUEZ_DBUS_DEVICE_INTERFACE {
@@ -167,7 +171,7 @@ impl DbusBleRepo {
                     if let Some(device) = devices.iter_mut().find(|d| d.path == path) {
                         device.service_data = Self::parse_service_data(&p.changed_properties);
 
-                        (&mut *on_device_found.lock().unwrap())(&device);
+                        (&mut *on_advertisement_data.lock().unwrap())(&device);
                     }
                 }
                 true
