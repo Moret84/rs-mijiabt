@@ -1,11 +1,12 @@
-mod mijia_bt;
 mod ble;
+mod mijia_bt;
+mod mijiabt_data;
 
 use ctrlc;
 
-use std::sync::Arc;
-
 use mijia_bt::MijiaBt;
+
+use std::sync::Arc;
 
 fn main() {
     let mut mijia_bt = MijiaBt::new();

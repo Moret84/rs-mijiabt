@@ -1,6 +1,6 @@
 [package]
 name = "mijiabt"
-version = "0.1.0"
+version = "1.0.0"
 authors = ["Aurélien Rivet <aurelienrivet@hotmail.fr>"]
 edition = "2018"
 
@@ -8,3 +8,5 @@ edition = "2018"
 btleplug = "0.4.1"
 dbus = "0.8.2"
 ctrlc = "3.1.4"
+serde = { version= "1.0.106", features= ["derive"] }
+serde_json = "1.0"

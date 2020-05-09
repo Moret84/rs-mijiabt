@@ -1,7 +1,9 @@
 use crate::ble::api::BleDevice;
 use crate::ble::dbus::dbus_ble_repo::DbusBleRepo;
 
-use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
+use crate::mijiabt_data::MijiaBtData;
+
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -11,7 +13,7 @@ const TARGET_SERVICE_UUID: &str = "0000fe95-0000-1000-8000-00805f9b34fb";
 
 pub struct MijiaBt {
     ble_repo: DbusBleRepo,
-    current_data: Arc<(AtomicU16, AtomicU16)>,
+    current_data: Arc<MijiaBtData>,
     on_data_updated: Arc<Mutex<Option<Box<dyn FnMut((u16, u16)) + Send + Sync + 'static>>>>,
     listening: Arc<AtomicBool>
 }
@@ -21,7 +23,7 @@ impl MijiaBt {
     pub fn new() -> MijiaBt {
         let mijia_bt = MijiaBt {
             ble_repo: DbusBleRepo::new(),
-            current_data: Arc::new((AtomicU16::new(0), AtomicU16::new(0))),
+            current_data: Arc::new(MijiaBtData::new()),
             on_data_updated: Arc::new(Mutex::new(None)),
             listening: Arc::new(AtomicBool::new(false))
         };
@@ -81,22 +83,20 @@ impl MijiaBt {
 
                                 let mut data_changed = false;
 
-                                if mijiabt_data_clone.0.load(Ordering::Relaxed) != new_data.0 && new_data.0 != 0 {
-                                    mijiabt_data_clone.0.store(new_data.0, Ordering::Relaxed);
+                                let (current_temperature, current_humidity) = mijiabt_data_clone.get();
+                                if current_temperature != new_data.0 && new_data.0 != 0 {
                                     data_changed = true;
                                 }
 
-                                if mijiabt_data_clone.1.load(Ordering::Relaxed) != new_data.1  && new_data.1 != 0 {
-                                    mijiabt_data_clone.1.store(new_data.1, Ordering::Relaxed);
+                                if current_humidity != new_data.1  && new_data.1 != 0 {
                                     data_changed = true;
                                 }
 
                                 if data_changed {
-                                    let temperature = mijiabt_data_clone.0.load(Ordering::Relaxed);
-                                    let humidity = mijiabt_data_clone.1.load(Ordering::Relaxed);
+                                    mijiabt_data_clone.update(new_data.0, new_data.1);
 
                                     if let Some(on_data_updated) = &mut *on_data_updated_clone.lock().unwrap() {
-                                        on_data_updated((temperature, humidity));
+                                        on_data_updated(mijiabt_data_clone.get());
                                     }
                                 }
                             }
