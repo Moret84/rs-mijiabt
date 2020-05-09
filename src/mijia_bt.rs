@@ -14,7 +14,7 @@ const TARGET_SERVICE_UUID: &str = "0000fe95-0000-1000-8000-00805f9b34fb";
 pub struct MijiaBt {
     ble_repo: DbusBleRepo,
     current_data: Arc<MijiaBtData>,
-    on_data_updated: Arc<Mutex<Option<Box<dyn FnMut((u16, u16)) + Send + Sync + 'static>>>>,
+    on_data_updated: Arc<Mutex<Option<Box<dyn FnMut(&MijiaBtData) + Send + Sync + 'static>>>>,
     listening: Arc<AtomicBool>
 }
 
@@ -23,7 +23,7 @@ impl MijiaBt {
     pub fn new() -> MijiaBt {
         let mijia_bt = MijiaBt {
             ble_repo: DbusBleRepo::new(),
-            current_data: Arc::new(MijiaBtData::new()),
+            current_data: Arc::new(MijiaBtData::new(0, 0)),
             on_data_updated: Arc::new(Mutex::new(None)),
             listening: Arc::new(AtomicBool::new(false))
         };
@@ -68,7 +68,7 @@ impl MijiaBt {
     /// # Arguments:
     /// * `callback` - The callback to call when a mijia bt data update occurs
     ///                The callback take a (temperature, humidity) u16 tuple as parameter.
-    pub fn set_on_data_updated_callback(&mut self, callback: Option<impl FnMut((u16, u16)) + Send + Sync + 'static>) {
+    pub fn set_on_data_updated_callback(&mut self, callback: Option<impl FnMut(&MijiaBtData) + Send + Sync + 'static>) {
         match callback {
             None => self.on_data_updated = Arc::new(Mutex::new(None)),
             Some(callback) => {
@@ -97,7 +97,7 @@ impl MijiaBt {
                                     mijiabt_data_clone.update(new_data.0, new_data.1);
 
                                     if let Some(on_data_updated) = &mut *on_data_updated_clone.lock().unwrap() {
-                                        on_data_updated(mijiabt_data_clone.get());
+                                        on_data_updated(&*mijiabt_data_clone);
                                     }
                                 }
                             }
