@@ -59,6 +59,7 @@ impl MijiaBt {
     /// Stop listening the mijia bt sensor.
     ///
     pub fn stop_listening(&self) {
+        self.ble_repo.stop_scan();
         self.listening.store(false, Ordering::SeqCst);
     }
 
