@@ -1,17 +1,13 @@
-mod ble;
-mod mijia_bt;
-mod mijiabt_data;
-
 use ctrlc;
 
-use mijia_bt::MijiaBt;
+use mijiabt::MijiaBt;
 
 use std::sync::Arc;
 
 fn main() {
     let mut mijia_bt = MijiaBt::new();
-    mijia_bt.set_on_data_updated_callback(Some(|mijiabt_data: (u16, u16)| {
-        println!("Temperature: {}, Humidity: {}", mijiabt_data.0, mijiabt_data.1);
+    mijia_bt.set_on_data_updated_callback(Some(|(temperature, humidity)| {
+        println!("Temperature: {}, Humidity: {}", temperature, humidity);
     }));
 
     let mijia_bt = Arc::new(mijia_bt);
