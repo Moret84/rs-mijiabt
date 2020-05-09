@@ -47,7 +47,7 @@ impl DbusBleRepo {
         let mut dbus_ble_repo = DbusBleRepo {
             dbus_connection: Arc::new(Mutex::new(connection)),
             found_devices: Arc::new(Mutex::new(Vec::new())),
-            on_advertisement_data: Arc::new(Mutex::new(Box::new(|device| {}))),
+            on_advertisement_data: Arc::new(Mutex::new(Box::new(|_device| {}))),
             interface_added_match_rule_token: None,
             properties_changed_match_rule_token: None,
         };

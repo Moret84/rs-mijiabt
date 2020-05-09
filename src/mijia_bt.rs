@@ -1,8 +1,6 @@
 use crate::ble::api::BleDevice;
 use crate::ble::dbus::dbus_ble_repo::DbusBleRepo;
 
-use ctrlc;
-
 use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -28,14 +26,6 @@ impl MijiaBt {
             listening: Arc::new(AtomicBool::new(false))
         };
 
-        ctrlc::set_handler({
-            let listening = mijia_bt.listening.clone();
-            move || {
-                listening.store(false, Ordering::SeqCst);
-                println!("SIGINT received. Exiting...");
-            }
-        }).expect("Error setting Ctrl-C handler");
-
         mijia_bt
     }
 
@@ -44,7 +34,6 @@ impl MijiaBt {
     /// # Arguments:
     /// * `timeout` - The time in seconds to listen the bt sensor.
     ///               If None is passed, the program waits forever.
-    ///               It can anywya be interrupted using Ctrl-C.
     pub fn start_listening(&self, timeout: Option<u64>) {
         println!("Start listening the mijia bt sensor...\n\
                  Ctrl-C to stop");
@@ -63,6 +52,12 @@ impl MijiaBt {
                 }
             }
         }
+    }
+
+    /// Stop listening the mijia bt sensor.
+    ///
+    pub fn stop_listening(&self) {
+        self.listening.store(false, Ordering::SeqCst);
     }
 
     /// Set the on data updated callback.
